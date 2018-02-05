@@ -1,0 +1,137 @@
+(* Coursera Programming Languages, Homework 3, Provided Code *)
+
+exception NoAnswer
+
+datatype pattern = Wildcard
+		 | Variable of string
+		 | UnitP
+		 | ConstP of int
+		 | TupleP of pattern list
+		 | ConstructorP of string * pattern
+
+datatype valu = Const of int
+	      | Unit
+	      | Tuple of valu list
+	      | Constructor of string * valu
+
+fun g f1 f2 p =
+    let 
+	val r = g f1 f2 
+    in
+	case p of
+	    Wildcard          => f1 ()
+	  | Variable x        => f2 x
+	  | TupleP ps         => List.foldl (fn (p,i) => (r p) + i) 0 ps
+	  | ConstructorP(_,p) => r p
+	  | _                 => 0
+    end
+
+(**** for the challenge problem only ****)
+
+datatype typ = Anything
+	     | UnitT
+	     | IntT
+	     | TupleT of typ list
+	     | Datatype of string
+
+			       
+(**** you can put all your code here ****)
+
+val only_capitals =
+    List.filter (fn x => Char.isUpper(String.sub(x,0)));
+
+val longest_string1 =
+    foldl (fn (x,y) => if String.size(x) > String.size(y) then x else y) "";
+	  
+val longest_string2 =
+    foldl (fn (x,y) => if String.size(x) >= String.size(y) then x else y) "";    
+
+fun longest_string_helper f  str_list =
+    foldl (fn (x,y) => if f ((String.size x), (String.size y)) then x else y) "" str_list;
+
+val longest_string3 =  longest_string_helper (fn (a, b) => (a > b));
+
+val longest_string4 =  longest_string_helper (fn (a, b) => (a >= b));
+
+val longest_capitalized = longest_string2 o only_capitals;
+    
+val rev_string = implode o rev o explode ; 
+
+fun first_answer f input_list =
+    case input_list of
+	[] => raise NoAnswer
+      | x::xs => case f x of
+		     NONE => first_answer f xs
+		  | SOME v => v 
+
+fun all_answers f input_list =
+    case input_list of
+	[] => SOME []
+      | x::xs => case f x of
+		     NONE => NONE
+		   | SOME v =>  case (all_answers f xs) of
+				    NONE => NONE
+				  | SOME vs => SOME (v @ vs) 
+		     
+fun count_wildcards ptn =
+    let
+	fun f1 x = 1
+	fun f2 x = 0
+    in
+	g f1 f2 ptn
+    end
+
+fun count_wild_and_variable_lengths ptn =
+    let
+	fun f1 x = 1
+	fun f2 x = String.size(x)
+    in
+	g f1 f2 ptn
+    end 
+
+fun count_some_var (str, ptn) =
+    let
+	fun f1 x = 0
+	fun f2 x = if (str = x)
+		   then 1
+		   else 0
+    in
+	g f1 f2 ptn
+    end 
+
+fun check_pat ptn =
+    let
+	fun g2 p =
+		case p of
+		    Wildcard          => []
+		  | Variable x        => [x]
+		  | TupleP ps         => List.foldl (fn (p,i) => (g2 p) @ i) [] ps
+		  | ConstructorP(_,p) => g2 p
+		  | _                 => []
+	fun g3 str_list =
+	    case str_list of
+		[] => true
+	      | x::xs => List.exists (fn a => a <> x) xs andalso g3 xs
+    in
+	not (g3 (g2 ptn))
+    end
+	
+fun match v_ptn =
+    case v_ptn of
+	(_, Wildcard) => SOME []
+      | (v, Variable (s)) => SOME [(s,v)]
+      | (Unit, UnitP) => SOME []
+      | (Const i1, ConstP i2) => if i1 = i2 then SOME [] else NONE
+      | (Tuple (vs), TupleP (ps)) => if length vs = length ps
+				     then all_answers match (ListPair.zip (vs, ps))
+				     else NONE
+      | (Constructor(s2,v), ConstructorP(s1,p)) => let val mt = match (v,p)
+						   in if s1 = s2 andalso isSome mt
+						      then mt
+						      else NONE
+						   end
+      | _ => NONE 
+
+fun first_match v ptn_list =
+    SOME (first_answer (fn x => match (v,x)) ptn_list)
+    handle NoAnswer => NONE
